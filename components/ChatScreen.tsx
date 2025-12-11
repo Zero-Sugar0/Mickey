@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Message, ChatMode, MessageRole, COLORS, GeminiModelId, MODEL_OPTIONS } from '../types';
+import { Message, ChatMode, MessageRole, COLORS, GeminiModelId, MODEL_OPTIONS, GeminiImageModelId, IMAGE_MODEL_OPTIONS, ImageResolution } from '../types';
 import { sendMessageToGemini, generateSpeech } from '../services/geminiService';
 import { loadChatMessages, saveChat, saveChatImmediately } from '../services/storageService';
 import Layout from './Layout';
@@ -121,7 +121,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ onBack, onNewChat, onOpenVoiceM
   
   // Model Selection State
   const [selectedModel, setSelectedModel] = useState<GeminiModelId>('gemini-flash-latest');
+  const [selectedImageModel, setSelectedImageModel] = useState<GeminiImageModelId>('gemini-2.5-flash-image');
+  const [imageResolution, setImageResolution] = useState<ImageResolution>('1K');
+
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isResDropdownOpen, setIsResDropdownOpen] = useState(false);
   
   // Keep ref updated
   useEffect(() => {
@@ -283,13 +287,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ onBack, onNewChat, onOpenVoiceM
     const streamMsgId = crypto.randomUUID();
     let isStreaming = false;
 
+    // Determine effective model ID based on mode
+    let effectiveModelId = '';
+    if (mode === ChatMode.IMAGE_GEN) {
+        effectiveModelId = selectedImageModel;
+    } else {
+        effectiveModelId = selectedModel;
+    }
+
     try {
       const finalResponse = await sendMessageToGemini(
           messages, 
           textToSend, 
           mode, 
           language, 
-          selectedModel, // Pass selected model
+          effectiveModelId, 
           (streamText) => {
               if (!isStreaming) {
                   isStreaming = true;
@@ -306,7 +318,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ onBack, onNewChat, onOpenVoiceM
                   ));
               }
           },
-          currentAttachment ? { base64: currentAttachment.base64, mimeType: currentAttachment.mimeType || 'image/jpeg' } : undefined
+          currentAttachment ? { base64: currentAttachment.base64, mimeType: currentAttachment.mimeType || 'image/jpeg' } : undefined,
+          imageResolution 
       );
 
       if (!isStreaming) {
@@ -399,7 +412,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ onBack, onNewChat, onOpenVoiceM
 
   const activePreview = previewMedia ? previewMedia : (attachment ? { url: attachment.previewUrl, type: attachment.type } : null);
 
-  const getModelLabel = (id: GeminiModelId) => MODEL_OPTIONS.find(m => m.id === id)?.label || id;
+  const getModelLabel = () => {
+      if (mode === ChatMode.IMAGE_GEN) {
+          return IMAGE_MODEL_OPTIONS.find(m => m.id === selectedImageModel)?.label || selectedImageModel;
+      }
+      return MODEL_OPTIONS.find(m => m.id === selectedModel)?.label || selectedModel;
+  };
 
   const hasContent = inputText.trim().length > 0 || attachment !== null;
 
@@ -736,14 +754,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ onBack, onNewChat, onOpenVoiceM
                         <Paperclip size={18} />
                     </button>
 
-                    {/* Model Selector (Only for Chat Mode) */}
+                    {/* Model Selector (Chat Mode) */}
                     {mode === ChatMode.DEFAULT && (
                         <div className="relative">
                             <button
                                 onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
                             >
-                                {getModelLabel(selectedModel)}
+                                {getModelLabel()}
                                 {isModelDropdownOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             </button>
                             
@@ -767,6 +785,76 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ onBack, onNewChat, onOpenVoiceM
                                         ))}
                                     </div>
                                 </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Model Selector (Image Mode) */}
+                    {mode === ChatMode.IMAGE_GEN && (
+                        <div className="flex gap-2">
+                             <div className="relative">
+                                <button
+                                    onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                                >
+                                    {getModelLabel()}
+                                    {isModelDropdownOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
+                                
+                                {/* Dropdown Menu */}
+                                {isModelDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setIsModelDropdownOpen(false)} />
+                                        <div className="absolute bottom-full left-0 mb-2 w-52 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20 animate-fade-in">
+                                            {IMAGE_MODEL_OPTIONS.map((opt) => (
+                                                <button
+                                                    key={opt.id}
+                                                    onClick={() => {
+                                                        setSelectedImageModel(opt.id);
+                                                        setIsModelDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center justify-between ${selectedImageModel === opt.id ? 'bg-blue-50/50 text-blue-600 font-medium' : 'text-gray-700'}`}
+                                                >
+                                                    {opt.label}
+                                                    {selectedImageModel === opt.id && <Check size={14} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Resolution Selector (Only for Gemini 3 Pro) */}
+                            {selectedImageModel === 'gemini-3-pro-image-preview' && (
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsResDropdownOpen(!isResDropdownOpen)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                                    >
+                                        {imageResolution}
+                                        {isResDropdownOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                    </button>
+
+                                    {isResDropdownOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-10" onClick={() => setIsResDropdownOpen(false)} />
+                                            <div className="absolute bottom-full left-0 mb-2 w-24 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20 animate-fade-in">
+                                                {['1K', '2K', '4K'].map((res) => (
+                                                    <button
+                                                        key={res}
+                                                        onClick={() => {
+                                                            setImageResolution(res as ImageResolution);
+                                                            setIsResDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${imageResolution === res ? 'bg-blue-50/50 text-blue-600 font-medium' : 'text-gray-700'}`}
+                                                    >
+                                                        {res}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}

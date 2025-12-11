@@ -1,4 +1,5 @@
 
+
 export enum ScreenName {
   HOME = 'HOME',
   VOICE = 'VOICE',
@@ -33,7 +34,7 @@ export interface UserState {
 
 export enum ChatMode {
   DEFAULT = 'default', // Text Chat
-  IMAGE_GEN = 'image_gen', // Gemini 3 Pro Image
+  IMAGE_GEN = 'image_gen', // Gemini 3 Pro / 2.5 Flash Image
   VIDEO_GEN = 'video_gen', // Veo
 }
 
@@ -75,4 +76,12 @@ export const MODEL_OPTIONS: {id: GeminiModelId, label: string}[] = [
     { id: 'gemini-flash-lite-latest', label: 'Gemini 2.5 Flash Lite' },
     { id: 'gemini-flash-latest', label: 'Gemini 2.5 Flash' },
     { id: 'gemini-3-pro-preview', label: 'Gemini 3.0 Preview' },
+];
+
+export type GeminiImageModelId = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview';
+export type ImageResolution = '1K' | '2K' | '4K';
+
+export const IMAGE_MODEL_OPTIONS: {id: GeminiImageModelId, label: string}[] = [
+    { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image' },
+    { id: 'gemini-3-pro-image-preview', label: 'Gemini 3.0 Pro Image' },
 ];

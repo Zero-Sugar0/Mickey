@@ -1,6 +1,7 @@
 
+
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { Message, ChatMode, MessageRole } from '../types';
+import { Message, ChatMode, MessageRole, ImageResolution } from '../types';
 import { createPcmBlob, base64ToUint8Array, decodeAudioData } from './audioUtils';
 
 // Helper to initialize GenAI with the latest API key
@@ -73,24 +74,48 @@ export const sendMessageToGemini = async (
   language: string,
   modelId: string,
   onStreamUpdate?: (text: string) => void,
-  attachment?: Attachment
+  attachment?: Attachment,
+  imageResolution?: ImageResolution
 ): Promise<Message> => {
   const ai = getAiClient();
   
   // 1. Image Generation Mode
   if (mode === ChatMode.IMAGE_GEN) {
-    const model = 'gemini-3-pro-image-preview';
-    const config = {
+    const isPro = modelId === 'gemini-3-pro-image-preview';
+    
+    // Config setup
+    const config: any = {
       imageConfig: {
-        imageSize: '1K',
         aspectRatio: '1:1',
       },
     };
+
+    // Only Pro model supports explicit imageSize
+    if (isPro && imageResolution) {
+        config.imageConfig.imageSize = imageResolution;
+    }
+
+    // Build contents
+    const parts: any[] = [];
     
+    // If we have an attachment, add it first (Image Editing / Variation)
+    // Both 2.5 Flash Image and 3 Pro Image support image input + text prompt
+    if (attachment) {
+        parts.push({
+            inlineData: {
+                data: attachment.base64,
+                mimeType: attachment.mimeType
+            }
+        });
+    }
+
+    // Add text prompt
+    parts.push({ text: newMessage });
+
     try {
         const response = await ai.models.generateContent({
-            model,
-            contents: { parts: [{ text: newMessage }] }, // Prompt includes language instruction implicitly if user types it, or we can prepend
+            model: modelId, // Uses passed modelId (2.5 Flash Image or 3 Pro Image)
+            contents: { parts },
             config
         });
         
