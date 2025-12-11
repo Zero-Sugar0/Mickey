@@ -1,0 +1,8 @@
+{
+  "name": "Mikey",
+  "description": "Mikey - Your friendly AI assistant featuring Voice Mode, Chat, and Media Generation.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
